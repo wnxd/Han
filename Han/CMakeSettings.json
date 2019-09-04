@@ -1,0 +1,32 @@
+﻿{
+  "configurations": [
+    {
+      "name": "IDA64-Win",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "clang_cl_x64" ],
+      "variables": [],
+      "intelliSenseMode": "windows-msvc-x64",
+      "cmakeToolchain": "IDA64-Win.cmake"
+    },
+    {
+      "name": "IDA32-Win",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [],
+      "intelliSenseMode": "windows-msvc-x64",
+      "cmakeToolchain": "IDA32-Win.cmake"
+    }
+  ]
+}
