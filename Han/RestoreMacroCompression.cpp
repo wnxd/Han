@@ -1,9 +1,9 @@
 #include "RestoreMacroCompression.h"
-#define USE_DANGEROUS_FUNCTIONS
-#include <hexrays.hpp>
 #include <map>
 #include <vector>
-#include <HookerFactory.h>
+#include <string>
+#define USE_DANGEROUS_FUNCTIONS
+#include <hexrays.hpp>
 
 #define FCHUNK_MAXSIZE 0x50
 
@@ -26,9 +26,8 @@ struct mba_info
 
 asm_type cur_asm_type;
 std::map<ea_t, mba_info> microcode_cache;
+std::map<std::string, mop_t> mop_cache;
 bool is_preload = false;
-std::unique_ptr<hooker::HookerFactory> factory = hooker::HookerFactory::getInstance();
-const hooker::Hooker& hook = factory->getHooker();
 
 intptr_t right_shift_loop(intptr_t num, intptr_t n)
 {
@@ -63,7 +62,7 @@ intptr_t get_minsn_hash(minsn_t *minsn)
 	intptr_t r = get_mop_hash(&(minsn->r));
 	intptr_t d = get_mop_hash(&(minsn->d));
 	intptr_t c = l ^ r ^ d;
-	intptr_t n = (sizeof(intptr_t) * 8) - 8;
+	int n = (sizeof(intptr_t) * 8) - 8;
 	intptr_t t = minsn->opcode << n;
 	intptr_t hash = t ^ c;
 	return hash;
@@ -153,9 +152,11 @@ void mba_cpy(mbl_array_t *dst, mbl_array_t *src, ea_t ea = BADADDR)
 
 mop_t get_mop(const char *reg_name, int s)
 {
-	size_t len = strlen(reg_name) + 10;
 	char reg_full_name[24];
 	sprintf_s(reg_full_name, "%s.%d", reg_name, s);
+	auto it = mop_cache.find(reg_full_name);
+	if (it != mop_cache.end())
+		return it->second;
 	mop_t mop(0, s);
 	try
 	{
@@ -170,6 +171,7 @@ mop_t get_mop(const char *reg_name, int s)
 	{
 		mop.zero();
 	}
+	mop_cache[reg_full_name] = mop;
 	return mop;
 }
 
@@ -341,18 +343,8 @@ ssize_t idaapi ui_notification(void *user_data, int notification_code, va_list v
 	return 0;
 }
 
-void* (*old_hexdsp)(int code, ...);
-
-void* new_hexdsp(int code, ...)
-{
-
-
-	return NULL;
-}
-
 void InitRestoreMacroCompression()
 {
-	test();
 	if (strcmp(inf.procname, "ARM") == 0 || strcmp(inf.procname, "ARMB") == 0) //arm
 		cur_asm_type = inf_is_64bit() ? at_arm64 : at_arm;
 	else if (memcmp(inf.procname, "80386", 5) == 0 || memcmp(inf.procname, "80486", 5) == 0 || memcmp(inf.procname, "80586", 5) == 0 || memcmp(inf.procname, "80686", 5) == 0 || strcmp(inf.procname, "metapc") == 0 || strcmp(inf.procname, "p2") == 0 || strcmp(inf.procname, "p3") == 0 || strcmp(inf.procname, "p4") == 0)
@@ -360,14 +352,13 @@ void InitRestoreMacroCompression()
 	else
 		cur_asm_type = at_unknown;
 	install_hexrays_callback(&hexrays_callback, NULL);
-	// hook.hook(hexdsp, &new_hexdsp, (void **)(&old_hexdsp));
 	hook_to_notification_point(HT_UI, &ui_notification, NULL);
 }
 
 void UnInitRestoreMacroCompression()
 {
 	remove_hexrays_callback(&hexrays_callback, NULL);
-	// hook.unhook(hexdsp, old_hexdsp);
 	unhook_from_notification_point(HT_UI, &ui_notification, NULL);
 	microcode_cache.clear();
+	mop_cache.clear();
 }

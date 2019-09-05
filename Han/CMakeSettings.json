@@ -9,9 +9,7 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-v",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "clang_cl_x64" ],
-      "variables": [],
-      "intelliSenseMode": "windows-msvc-x64",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
       "cmakeToolchain": "IDA64-Win.cmake"
     },
     {
@@ -24,8 +22,6 @@
       "buildCommandArgs": "-v",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "variables": [],
-      "intelliSenseMode": "windows-msvc-x64",
       "cmakeToolchain": "IDA32-Win.cmake"
     }
   ]
