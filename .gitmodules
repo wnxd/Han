@@ -1,6 +1,3 @@
-[submodule "Han/inline-hook"]
-	path = Han/inline-hook
-	url = https://github.com/wnxd/inline-hook
 [submodule "Han/HookZz"]
 	path = Han/HookZz
 	url = https://github.com/wnxd/HookZz
