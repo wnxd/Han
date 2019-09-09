@@ -486,7 +486,6 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 			info.retn = get_mba_retn(mba);
 			info.mba = mba;
 			info.hash = mba_hash;
-			int xxx = 0;
 			for (int i = 0; i < mba->qty; i++)
 			{
 				mblock_t* block = mba->get_mblock(i);
@@ -501,13 +500,7 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 						{
 							mba_info* fchunk_mba = PreloadMacroCompression(pfn);
 							if (fchunk_mba != NULL && fchunk_mba->mba != NULL && fchunk_mba->retn <= 1 && get_minsn_count(fchunk_mba->mba) <= FCHUNK_MINSN_MAXSIZE)
-							{
 								RestoreMacroCompression(mba, fchunk_mba->mba->blocks, i);
-								//if (xxx++ == 0)
-								//{
-								//	break;
-								//}
-							}
 						}
 					}
 				}
@@ -616,16 +609,6 @@ void InitRestoreMacroCompression()
 		cur_asm_type = inf_is_64bit() ? at_x64 : at_x86;
 	else
 		cur_asm_type = at_unknown;
-
-	func_t* pfn = get_func(0x0000000000170FAC);
-	if (pfn != NULL)
-	{
-		is_preload = true;
-		PreloadMacroCompression(pfn);
-		is_preload = false;
-	}
-
-
 	install_hexrays_callback(&hexrays_callback, NULL);
 	//hook_to_notification_point(HT_UI, &ui_notification, NULL);
 	if (plthook_open_by_address(&plthook, hexdsp) == PLTHOOK_SUCCESS)
