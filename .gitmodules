@@ -1,0 +1,3 @@
+[submodule "Han/plthook"]
+	path = Han/plthook
+	url = https://github.com/kubo/plthook
