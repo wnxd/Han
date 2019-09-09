@@ -3,7 +3,15 @@
 #
 cmake_minimum_required (VERSION 3.8)
 
-project ("Han")
+project ("Han" C CXX)
+
+if (CMAKE_HOST_WIN32)
+	set (plthook "plthook/plthook_win32.c")
+elseif (CMAKE_HOST_UNIX)
+	set (plthook "plthook/plthook_elf.c")
+elseif (CMAKE_HOST_APPLE)
+	set (plthook "plthook/plthook_osx.c")
+endif ()
 
 if (IDA_TYPE STREQUAL "64")
 	set (Han Han64)
@@ -15,4 +23,10 @@ add_library (${Han} SHARED "main.cpp" "RestoreMacroCompression.cpp" "RestoreMacr
 
 target_include_directories (${Han} PUBLIC "${IDA_PATH}/plugins/hexrays_sdk/include" "${IDA_SDK_PATH}/include")
 
-target_link_libraries (${Han} LINK_PUBLIC ${IDA_LIB})
+target_link_libraries (${Han} PUBLIC ${IDA_LIB})
+
+add_library (plthook STATIC "plthook/plthook.h" ${plthook})
+
+target_include_directories (${Han} PUBLIC "${PROJECT_SOURCE_DIR}/plthook")
+
+target_link_libraries (${Han} PUBLIC plthook)

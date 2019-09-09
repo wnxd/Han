@@ -10,7 +10,8 @@
       "buildCommandArgs": "-v",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "cmakeToolchain": "IDA64-Win.cmake"
+      "cmakeToolchain": "IDA64-Win.cmake",
+      "variables": []
     },
     {
       "name": "IDA32-Win",
@@ -22,7 +23,8 @@
       "buildCommandArgs": "-v",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "cmakeToolchain": "IDA32-Win.cmake"
+      "cmakeToolchain": "IDA32-Win.cmake",
+      "variables": []
     }
   ]
 }
