@@ -3,7 +3,7 @@
 #include <hexrays.hpp>
 #include <plthook.h>
 
-#define FCHUNK_MAXSIZE 0x60
+#define FCHUNK_MAXSIZE 0x100
 #define FCHUNK_MINSN_MAXSIZE 0x30
 
 enum asm_type
@@ -235,6 +235,31 @@ int get_minsn_count(mbl_array_t* mba)
 	return count;
 }
 
+int get_subcall_count(mbl_array_t* mba)
+{
+	int count = 0;
+	for (int i = 0; i < mba->qty; i++)
+	{
+		mblock_t* block = mba->get_mblock(i);
+		minsn_t* insn = block->tail;
+		if (insn != NULL)
+		{
+			if (insn->opcode == m_call && insn->l.t == mop_v)
+			{
+				ea_t address = insn->l.g;
+				if (is_sub(address))
+					count++;
+			}
+		}
+	}
+	return count;
+}
+
+bool is_fchunk(mbl_array_t* mba)
+{
+	return mba->qty <= 5 || get_minsn_count(mba) <= FCHUNK_MINSN_MAXSIZE || get_subcall_count(mba) == 0;
+}
+
 void blk_cpy(mblock_t* dst, mblock_t* src, ea_t ea = BADADDR)
 {
 	dst->flags = src->flags;
@@ -409,7 +434,7 @@ void RestoreMacroCompression(mbl_array_t* mba, mblock_t* fchunk_mba, int& index)
 	mblock_t* last_block = NULL;
 	mblock_t* cur_block = NULL;
 	qvector<mblock_t*> block_list = get_all_blk(fchunk_mba);
-	FixBlockSerial(mba->blocks, block->nextb->serial, block_list.size());
+	//FixBlockSerial(mba->blocks, block->nextb->serial, block_list.size());
 	std::map<int, int> serial_map;
 	for (mblock_t* fchunk_block : block_list)
 	{
@@ -435,6 +460,16 @@ void RestoreMacroCompression(mbl_array_t* mba, mblock_t* fchunk_mba, int& index)
 					last_insn->l.b = tmp_block->serial;
 				}
 			}
+			else if (last_insn->opcode >= m_jcnd && last_insn->opcode <= m_jle && last_insn->d.t == mop_v)
+			{
+				ea_t address = last_insn->d.g;
+				mblock_t* tmp_block = get_blk(fchunk_mba, address);
+				if (tmp_block != NULL)
+				{
+					last_insn->d.t = mop_b;
+					last_insn->d.b = tmp_block->serial;
+				}
+			}
 		}
 	}
 	if (cur_block != NULL)
@@ -446,11 +481,13 @@ void RestoreMacroCompression(mbl_array_t* mba, mblock_t* fchunk_mba, int& index)
 		else if (is_minsn_goto_ea(last_insn))
 		{
 			last_insn->opcode = m_call;
+			FixSP(cur_block, last_insn->ea, false, last_insn->prev);
+			FixSP(cur_block, last_insn->ea, true, last_insn);
 		}
 		if (fix_sp)
 		{
 			FixSP(first_block, first_block->start, true);
-			FixSP(last_block, cur_block->tail->ea, false, last_block->tail);
+			FixSP(last_block, last_insn->ea, false, last_block->tail);
 		}
 	}
 	//if (first_block != NULL)
@@ -472,7 +509,7 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 	if (it != microcode_cache.end())
 	{
 		time_t x = t - it->second.time;
-		if ((it->second.mba != NULL && x < 120))
+		if (it->second.mba != NULL || (it->second.mba == NULL && x <= 2))
 			return &it->second;
 	}
 	mba_info& info = microcode_cache[mbr.start()];
@@ -499,12 +536,13 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 						if (pfn != NULL && pfn->start_ea == address && pfn->size() <= FCHUNK_MAXSIZE)
 						{
 							mba_info* fchunk_mba = PreloadMacroCompression(pfn);
-							if (fchunk_mba != NULL && fchunk_mba->mba != NULL && fchunk_mba->retn <= 1 && get_minsn_count(fchunk_mba->mba) <= FCHUNK_MINSN_MAXSIZE)
+							if (fchunk_mba != NULL && fchunk_mba->mba != NULL && fchunk_mba->modified == false && fchunk_mba->retn <= 1 && is_fchunk(fchunk_mba->mba))
 								RestoreMacroCompression(mba, fchunk_mba->mba->blocks, i);
 						}
 					}
 				}
 			}
+			info.modified = mba_hash != get_mba_hash(mba);
 			mblock_t* last_block = get_last_blk(mba->get_mblock(0), mba->get_mblock(mba->qty - 1));
 			if (last_block != NULL)
 			{
@@ -522,7 +560,7 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 								if (pfn->size() <= FCHUNK_MAXSIZE)
 								{
 									mba_info* fchunk_mba = PreloadMacroCompression(pfn);
-									if (fchunk_mba != NULL && fchunk_mba->mba != NULL && fchunk_mba->retn <= 1 && get_minsn_count(fchunk_mba->mba) <= FCHUNK_MINSN_MAXSIZE)
+									if (fchunk_mba != NULL && fchunk_mba->mba != NULL && fchunk_mba->modified == false && fchunk_mba->retn <= 1 && is_fchunk(fchunk_mba->mba))
 									{
 										int index = last_block->serial;
 										RestoreMacroCompression(mba, fchunk_mba->mba->blocks, index);
@@ -546,7 +584,6 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr)
 					}
 				}
 			}
-			info.modified = mba_hash != get_mba_hash(mba);
 		}
 	}
 	return &info;
@@ -562,26 +599,6 @@ ssize_t idaapi hexrays_callback(void* ud, hexrays_event_t event, va_list va)
 		{
 			if (it->second.modified && it->second.mba != NULL && it->second.mba != mba && it->second.hash == get_mba_hash(mba))
 				mba_cpy(mba, it->second.mba);
-		}
-	}
-	return 0;
-}
-
-ssize_t idaapi ui_notification(void* user_data, int notification_code, va_list va)
-{
-	if (notification_code == ui_preprocess_action)
-	{
-		char* name = va_arg(va, char*);
-		msg("ui_preprocess_action: %s\n", name);
-		if (strcmp(name, "hx:GenPseudo") == 0)
-		{
-			func_t* pfn = get_func(get_screen_ea());
-			if (pfn != NULL)
-			{
-				is_preload = true;
-				PreloadMacroCompression(pfn);
-				is_preload = false;
-			}
 		}
 	}
 	return 0;
@@ -610,7 +627,6 @@ void InitRestoreMacroCompression()
 	else
 		cur_asm_type = at_unknown;
 	install_hexrays_callback(&hexrays_callback, NULL);
-	//hook_to_notification_point(HT_UI, &ui_notification, NULL);
 	if (plthook_open_by_address(&plthook, hexdsp) == PLTHOOK_SUCCESS)
 		plthook_replace(plthook, "get_func", &new_get_func, (void**)& old_get_func);
 }
@@ -618,7 +634,6 @@ void InitRestoreMacroCompression()
 void UnInitRestoreMacroCompression()
 {
 	remove_hexrays_callback(&hexrays_callback, NULL);
-	//unhook_from_notification_point(HT_UI, &ui_notification, NULL);
 	plthook_replace(plthook, "get_func", old_get_func, NULL);
 	plthook_close(plthook);
 	microcode_cache.clear();
