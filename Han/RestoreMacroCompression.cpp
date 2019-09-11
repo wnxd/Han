@@ -9,10 +9,17 @@
 enum asm_type
 {
 	at_unknown,
-	at_x86,
-	at_x64,
-	at_arm,
-	at_arm64
+
+	at_32bit = 2,
+	at_64bit = 3,
+
+	at_x__ = 1 << 4,
+	at_arm__ = 2 << 4,
+
+	at_x86 = at_x__ | at_32bit,
+	at_x64 = at_x__ | at_64bit,
+	at_arm = at_arm__ | at_32bit,
+	at_arm64 = at_arm__ | at_64bit,
 };
 
 struct mba_info
@@ -266,17 +273,17 @@ void blk_cpy(mblock_t* dst, mblock_t* src, ea_t ea = BADADDR)
 	dst->start = src->start;
 	dst->end = src->end;
 	dst->type = src->type;
-	//dst->dead_at_start = src->dead_at_start;
-	//dst->mustbuse = src->mustbuse;
-	//dst->maybuse = src->maybuse;
-	//dst->mustbdef = src->mustbdef;
-	//dst->maybdef = src->maybdef;
-	//dst->dnu = src->dnu;
-	//dst->maxbsp = src->maxbsp;
-	//dst->minbstkref = src->minbstkref;
-	//dst->minbargref = src->minbargref;
-	//dst->predset = src->predset;
-	//dst->succset = src->succset;
+	dst->dead_at_start = src->dead_at_start;
+	dst->mustbuse = src->mustbuse;
+	dst->maybuse = src->maybuse;
+	dst->mustbdef = src->mustbdef;
+	dst->maybdef = src->maybdef;
+	dst->dnu = src->dnu;
+	dst->maxbsp = src->maxbsp;
+	dst->minbstkref = src->minbstkref;
+	dst->minbargref = src->minbargref;
+	dst->predset = src->predset;
+	dst->succset = src->succset;
 	minsn_t* src_insn = src->head;
 	minsn_t* dst_insn = NULL;
 	while (src_insn != NULL)
@@ -295,6 +302,12 @@ bool mba_cmp(mbl_array_t* mba1, mbl_array_t* mba2)
 
 void mba_cpy(mbl_array_t* dst, mbl_array_t* src, ea_t ea = BADADDR)
 {
+	for (int i = 0; i < dst->qty; i++)
+	{
+		mblock_t* dst_block = dst->get_mblock(i);
+		if (dst_block->tail != NULL)
+			dst_block->tail->_make_nop();
+	}
 	for (int i = dst->qty - 1; i >= 0; i--)
 	{
 		mblock_t* dst_block = dst->get_mblock(i);
@@ -362,13 +375,12 @@ mba_info* PreloadMacroCompression(const mba_ranges_t& mbr);
 
 void FixSP(mblock_t* block, ea_t ea, bool sub = false, minsn_t* position = NULL)
 {
+	if (cur_asm_type & at_arm__)
+		return;
 	minsn_t* insn = new minsn_t(ea);
 	insn->opcode = sub ? m_sub : m_add;
 	switch (cur_asm_type)
 	{
-	case at_unknown:
-		insn->_make_nop();
-		return;
 	case at_x86:
 		insn->l = insn->d = get_mop("esp", 4);
 		insn->r.make_number(4, 4, ea);
@@ -377,15 +389,8 @@ void FixSP(mblock_t* block, ea_t ea, bool sub = false, minsn_t* position = NULL)
 		insn->l = insn->d = get_mop("rsp", 8);
 		insn->r.make_number(8, 8, ea);
 		break;
-	case at_arm:
-		insn->l = insn->d = get_mop("sp", 4);
-		insn->r.make_number(4, 4, ea);
-		break;
-	case at_arm64:
-		insn->l = insn->d = get_mop("sp", 8);
-		insn->r.make_number(8, 8, ea);
-		break;
 	default:
+		insn->_make_nop();
 		break;
 	}
 	block->insert_into_block(insn, position);
@@ -628,7 +633,7 @@ void InitRestoreMacroCompression()
 		cur_asm_type = at_unknown;
 	install_hexrays_callback(&hexrays_callback, NULL);
 	if (plthook_open_by_address(&plthook, hexdsp) == PLTHOOK_SUCCESS)
-		plthook_replace(plthook, "get_func", &new_get_func, (void**)& old_get_func);
+		plthook_replace(plthook, "get_func", &new_get_func, (void**)(&old_get_func));
 }
 
 void UnInitRestoreMacroCompression()
